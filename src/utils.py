@@ -34,17 +34,38 @@ def generate_simulated_data(random_state=42):
     
     return data
 
-def load_cifar10_kaggle(path):
-    """Đọc dữ liệu CIFAR-10 từ folder bạn đã tải từ Kaggle (dạng pickle)"""
-    # CIFAR-10 Kaggle thường có các file data_batch_1, ..., test_batch
+
+def load_cifar10_longtail(path, imbalance_ratio=0.01):
+    """
+    path: Đường dẫn đến folder 'cifar-10-batches-py'
+    imbalance_ratio: Tỷ lệ giữa lớp ít nhất và lớp nhiều nhất (0.01 = 1%)
+    """
     def unpickle(file):
         with open(file, 'rb') as fo:
-            dict = pickle.load(fo, encoding='bytes')
-        return dict
+            return pickle.load(fo, encoding='bytes')
 
-    # Ví dụ load test_batch
-    data_file = os.path.join(path, 'test_batch')
-    d = unpickle(data_file)
-    x = d[b'data'].reshape(10000, 3, 32, 32).transpose(0, 2, 3, 1)
-    y = np.array(d[b'labels'])
-    return x, y
+    # Load toàn bộ 5 batch training
+    x_all, y_all = [], []
+    for i in range(1, 6):
+        d = unpickle(os.path.join(path, f'data_batch_{i}'))
+        x_all.append(d[b'data'])
+        y_all.append(d[b'labels'])
+    
+    X = np.vstack(x_all).reshape(-1, 3, 32, 32).transpose(0, 2, 3, 1)
+    Y = np.concatenate(y_all)
+
+    # Tạo phân phối Long-tail (Exponential decay)
+    n_classes = 10
+    img_max = 5000
+    selected_indices = []
+    
+    for cls_idx in range(n_classes):
+        # Tính số lượng ảnh giữ lại cho lớp này
+        num_imgs = int(img_max * (imbalance_ratio ** (cls_idx / (n_classes - 1.0))))
+        cls_indices = np.where(Y == cls_idx)[0]
+        np.random.shuffle(cls_indices)
+        selected_indices.append(cls_indices[:num_imgs])
+        print(f"Lớp {cls_idx}: giữ lại {num_imgs} ảnh")
+
+    sel_idx = np.concatenate(selected_indices)
+    return X[sel_idx], Y[sel_idx]
