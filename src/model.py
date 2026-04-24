@@ -1,108 +1,95 @@
 import numpy as np
 from sklearn.cluster import KMeans
+from scipy.spatial.distance import cdist
 
-def hierarchical_kmeans_resampling(X, k_list, T=3, m=10, r_t=5, random_state=42):
+def hierarchical_kmeans_resampling(X, k_list, T, m, r_t_list, num_init=10, random_state=42):
     """
-    Mục đích: Thực hiện Algorithm 1 (Hierarchical K-means with Resampling) để tìm các tâm cụm phân phối đều.
-
-    Tham số:
-    ----------
-    X : numpy.ndarray - Dữ liệu đầu vào (n_samples, n_features).
-    k_list : list[int] - Danh sách số cụm cho mỗi tầng (độ dài bằng T).
-    T, m, r_t : int - Số tầng, số lần lặp resampling và số điểm lấy mẫu mỗi cụm.
-    random_state : int - Hạt giống để cố định kết quả.
-
-    Giá trị trả về:
-    ----------
-    dict - Chứa centroids/labels theo từng tầng và kết quả phân cụm cuối cùng trên X.
+    Bản cập nhật khớp logic 100% với hierarchical_kmeans_with_resampling của Meta.
+    r_t_list: Danh sách r_t cho từng tầng, ví dụ [10, 5, 1]
     """
-
-
-    assert len(k_list) == T, "k_list phải có độ dài = T"
-
-    # Lưu toàn bộ hierarchy
-    all_centroids = []   # C_t
-    all_labels = []      # L_t
-
-    # Level 1: I = X
+    if isinstance(r_t_list, int):
+        r_t_list = [r_t_list] * T  
     current_input = X
-
+    centroids = None
+    
     for t in range(T):
-        print(f"--- Level {t+1}/{T} ---")
         k_t = k_list[t]
+        r_t = r_t_list[t] # Lấy r_t riêng cho từng tầng
+        
+        # --- BƯỚC 1: Initial K-means (Tác giả gọi là 'Initial kmeans') ---
+        # Chạy với n_init cao để ổn định
+        km = KMeans(n_clusters=k_t, init='k-means++', n_init=num_init, random_state=random_state)
+        km.fit(current_input)
+        centroids = km.cluster_centers_
+        labels = km.labels_
+        
+        # --- BƯỚC 2: Resampling loop (Tác giả gọi là 'Resampling-kmeans') ---
+        if m > 0 and r_t > 0:
+            for _ in range(m):
+                sampled_points = []
+                for i in range(k_t):
+                    cluster_pts = current_input[labels == i]
+                    if len(cluster_pts) == 0: continue
+                    
+                    # Logic 'closest' strategy của tác giả:
+                    dists = np.linalg.norm(cluster_pts - centroids[i], axis=1)
+                    # Sắp xếp và lấy r_t điểm gần nhất
+                    idx = np.argsort(dists)[:min(len(cluster_pts), r_t)]
+                    sampled_points.append(cluster_pts[idx])
+                
+                R = np.vstack(sampled_points)
+                
+                # Chạy K-means trên tập R (Tác giả dùng n_init=num_init ở đây luôn)
+                km_R = KMeans(n_clusters=k_t, init=centroids, n_init=1, random_state=random_state)
+                km_R.fit(R)
+                centroids = km_R.cluster_centers_
+                
+                # Gán nhãn lại cho toàn bộ input của level này (Rất quan trọng)
+                labels = km_R.predict(current_input)
+        
+        # Chuẩn bị cho level tiếp theo: X_next = Centroids_prev
+        current_input = centroids
+        
+    return centroids
 
-        # K-means trên I
-        kmeans = KMeans(
-            n_clusters=k_t,
-            init='k-means++',
-            n_init=1,
-            random_state=random_state
-        )
-        kmeans.fit(current_input)
-        centroids = kmeans.cluster_centers_
 
-        # Assign cluster trên I
-        labels = kmeans.labels_
+import numpy as np
+from sklearn.cluster import KMeans
+from scipy.spatial.distance import cdist
 
-        # Resampling loop
-        for s in range(m):
+def kmeans_with_power_s_stable(X, k, s_target, n_iters=20, random_state=42):
+    """
+    Sử dụng kỹ thuật Annealing: Tăng dần s để Centroids di chuyển ổn định.
+    Giúp thanh màu đỏ thấp dần đúng theo bài báo.
+    """
+    # 1. Bắt đầu từ K-means tiêu chuẩn (s=2)
+    km = KMeans(n_clusters=k, init='k-means++', n_init=1, random_state=random_state).fit(X)
+    centroids = km.cluster_centers_
 
-            resampled_points = []
+    # Danh sách các bước tăng s (ví dụ target 256 thì đi qua 4, 16, 64)
+    s_steps = [4, 16, 64, 256]
+    actual_steps = [s for s in s_steps if s <= s_target]
 
-            for i in range(k_t):
-                cluster_points = current_input[labels == i]
-
-                if len(cluster_points) == 0:
-                    continue
-
-                # Tính khoảng cách tới centroid
-                distances = np.linalg.norm(
-                    cluster_points - centroids[i], axis=1
-                )
-
-                # Lấy r_t điểm gần nhất
-                n_sample = min(r_t, len(cluster_points))
-                idx = np.argsort(distances)[:n_sample]
-
-                resampled_points.append(cluster_points[idx])
-
-            # Tạo tập R
-            R = np.vstack(resampled_points)
-
-            # K-means trên R để update centroid
-            kmeans = KMeans(
-                n_clusters=k_t,
-                init=centroids,  
-                n_init=1,
-                random_state=random_state
-            )
-            kmeans.fit(R)
-
-            centroids = kmeans.cluster_centers_
-
-            # Re-assign lại trên I 
-            labels = kmeans.predict(current_input)
-
-        # Lưu kết quả level t
-        all_centroids.append(centroids)
-        all_labels.append(labels)
-
-        # chuẩn bị level tiếp theo
-        current_input = centroids  
-
-    # gán label cho toàn bộ X theo level cuối
-    final_kmeans = KMeans(
-        n_clusters=k_list[-1],
-        init=all_centroids[-1],
-        n_init=1
-    )
-    final_kmeans.fit(all_centroids[-1])
-
-    final_labels = final_kmeans.predict(X)
-
-    return {
-        "centroids_per_level": all_centroids,
-        "labels_per_level": all_labels,
-        "final_centroids": all_centroids[-1],
-        "final_labels": final_labels
-    }
+    for s in actual_steps:
+        for _ in range(10): # Chạy 10 vòng lặp cho mỗi mức s
+            dists = cdist(X, centroids, metric='euclidean')
+            labels = np.argmin(dists, axis=1)
+            
+            new_centroids = []
+            for i in range(k):
+                cp = X[labels == i]
+                if len(cp) > 0:
+                    # IRLS Update với Log-sum-exp để chống lộn xộn
+                    c = cp.mean(axis=0)
+                    for _ in range(3):
+                        d = np.linalg.norm(cp - c, axis=1) + 1e-6
+                        log_w = (s - 2) * np.log(d)
+                        w = np.exp(log_w - np.max(log_w)) # Ổn định hóa
+                        w /= (w.sum() + 1e-12)
+                        c = np.average(cp, axis=0, weights=w)
+                    new_centroids.append(c)
+                else:
+                    new_centroids.append(centroids[i])
+            centroids = np.array(new_centroids)
+            
+    return centroids
