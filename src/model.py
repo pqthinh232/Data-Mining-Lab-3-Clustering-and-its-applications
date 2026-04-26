@@ -28,7 +28,7 @@ def hierarchical_kmeans_resampling(X, k_list, T, m, r_t_list, num_init=10, rando
         # --- BƯỚC 2: Resampling-kmeans (Vòng lặp làm phẳng) ---
         if m > 0 and r_t > 0:
             for s_step in range(m):
-                # 2.1 Lấy mẫu 'closest' theo logic tác giả
+                # 2.1 Lấy mẫu 'closest
                 sampled_points = []
                 for i in range(k_t):
                     cluster_pts = current_input[labels == i]
@@ -42,13 +42,12 @@ def hierarchical_kmeans_resampling(X, k_list, T, m, r_t_list, num_init=10, rando
                 
                 R = np.vstack(sampled_points)
                 
-                # 2.2 CHỖ SỬA QUAN TRỌNG: Chạy K-means trên R nhưng KHÔNG dùng warm start
-                # Tác giả khởi tạo lại (k-means++) để phá vỡ cấu trúc cũ
+                # khởi tạo lại (k-means++) để phá vỡ cấu trúc cũ
                 km_R = KMeans(n_clusters=k_t, init='k-means++', n_init=num_init, max_iter=50, tol=0, random_state=random_state)
                 km_R.fit(R)
                 centroids = km_R.cluster_centers_
                 
-                # 2.3 Gán nhãn lại cho toàn bộ tập input để vòng sau lấy mẫu chuẩn hơn
+                # Gán nhãn lại cho toàn bộ tập input để vòng sau lấy mẫu chuẩn hơn
                 labels = km_R.predict(current_input)
         
         # Centroids của tầng này là input cho tầng sau

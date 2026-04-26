@@ -6,16 +6,15 @@ def calculate_kl_divergence(points, L=3, step=0.02, bandwidth=0.5):
     Hàm tính KL chuẩn 100% theo logic của tác giả.
     Sử dụng tham số 'step' để khớp với lệnh gọi trong Notebook.
     """
-    # 1. Tạo lưới tọa độ
+
     x_range = np.arange(-L, L, step)
     y_range = np.arange(-L, L, step)
     gx, gy = np.meshgrid(x_range, y_range)
     grid = np.vstack([gx.ravel(), gy.ravel()]).T
 
-    # 2. Mật độ đều trên Omega
     d_u = 1 / (4 * L**2)
     
-    # 3. Ước lượng KDE (Dùng sklearn đúng như tác giả)
+    # 3. Ước lượng KDE
     kde = KernelDensity(bandwidth=bandwidth, kernel='gaussian').fit(points)
     
     # 4. Tính mật độ f và chuẩn hóa
@@ -59,7 +58,6 @@ def calculate_acc(y_true, y_pred):
         
     # 3. Sử dụng thuật toán Hungarian (linear_sum_assignment) 
     # để tìm cách gán nhãn sao cho tổng số mẫu khớp là lớn nhất.
-    # Lưu ý: linear_sum_assignment tìm chi phí nhỏ nhất, nên ta lấy Max - w.
     row_ind, col_ind = linear_sum_assignment(w.max() - w)
     
     # 4. Tính toán Accuracy
@@ -80,7 +78,6 @@ def calculate_nmi(y_true, y_pred):
     """
     return normalized_mutual_info_score(y_true, y_pred)
 
-# Bạn có thể thêm hàm tính Entropy vào đây để dùng chung trong Notebook
 def calculate_entropy(y_labels):
     """
     Mục đích: Tính toán Shannon Entropy của phân phối các lớp để đo độ cân bằng.
