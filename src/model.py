@@ -11,7 +11,7 @@ def hierarchical_kmeans_resampling(X, k_list, T, m, r_t_list, num_init=10, rando
     if isinstance(r_t_list, int):
         r_t_list = [r_t_list] * T  
         
-    current_input = X
+    current_input = X.astype(np.float64) 
     centroids = None
     
     for t in range(T):
