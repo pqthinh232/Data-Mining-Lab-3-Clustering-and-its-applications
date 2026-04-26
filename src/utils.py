@@ -69,3 +69,22 @@ def load_cifar10_longtail(path, imbalance_ratio=0.01):
 
     sel_idx = np.concatenate(selected_indices)
     return X[sel_idx], Y[sel_idx]
+
+def load_cifar10_test(path):
+    """
+    Mục đích: Load tập dữ liệu Test chuẩn của CIFAR-10 (10.000 ảnh cân bằng).
+    Tham số: path - đường dẫn đến thư mục 'cifar-10-batches-py'
+    """
+    def unpickle(file):
+        import pickle
+        with open(file, 'rb') as fo:
+            return pickle.load(fo, encoding='bytes')
+
+    # File test mặc định của CIFAR-10 tên là 'test_batch'
+    test_data = unpickle(os.path.join(path, 'test_batch'))
+    
+    # Xử lý pixel: (10000, 3072) -> (10000, 32, 32, 3)
+    X_test = test_data[b'data'].reshape(-1, 3, 32, 32).transpose(0, 2, 3, 1)
+    Y_test = np.array(test_data[b'labels'])
+    
+    return X_test, Y_test
