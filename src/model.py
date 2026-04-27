@@ -19,13 +19,13 @@ def hierarchical_kmeans_resampling(X, k_list, T, m, r_t_list, num_init=10, rando
         r_t = r_t_list[t]
         print(f"--- Level {t+1}/{T} (k={k_t}, r_t={r_t}) ---")
         
-        # --- BƯỚC 1: Initial K-means (Tác giả chạy 1 lần khởi tạo lớn) ---
+        # --- Initial K-means (chạy 1 lần khởi tạo lớn) ---
         km = KMeans(n_clusters=k_t, init='k-means++', n_init=num_init, max_iter=50, tol=0, random_state=random_state)
         km.fit(current_input)
         centroids = km.cluster_centers_
         labels = km.labels_
         
-        # --- BƯỚC 2: Resampling-kmeans (Vòng lặp làm phẳng) ---
+        # --- Resampling-kmeans ---
         if m > 0 and r_t > 0:
             for s_step in range(m):
                 # 2.1 Lấy mẫu 'closest

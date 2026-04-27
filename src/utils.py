@@ -83,7 +83,6 @@ def load_cifar10_test(path):
     # File test mặc định của CIFAR-10 tên là 'test_batch'
     test_data = unpickle(os.path.join(path, 'test_batch'))
     
-    # Xử lý pixel: (10000, 3072) -> (10000, 32, 32, 3)
     X_test = test_data[b'data'].reshape(-1, 3, 32, 32).transpose(0, 2, 3, 1)
     Y_test = np.array(test_data[b'labels'])
     
